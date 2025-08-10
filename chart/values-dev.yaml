@@ -1,0 +1,13 @@
+env:
+  - name: SPRING_PROFILES_ACTIVE
+    value: "dev"
+
+replicaCount: 1
+
+ingress:
+  enabled: true
+  hosts:
+    - host: mon-app.dev.mondomaine.com
+      paths:
+        - path: /
+          pathType: Prefix

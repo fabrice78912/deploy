@@ -1,0 +1,21 @@
+apiVersion: v2
+name: microservice-a
+description: Chart Helm pour le microservice A
+type: application
+version: 1.0.0           # Version du chart (utilisée pour les déploiements Helm)
+appVersion: "1.2.3"      # Version de l'application (souvent = tag docker par défaut)
+
+maintainers:
+  - name: RahMat Fabrice
+    email: fabricenokam@gmail.com
+
+keywords:
+  - microservice
+  - helm
+  - deployment
+
+home: https://github.com/ton-org/ton-projet
+sources:
+  - https://github.com/ton-org/ton-projet
+
+dependencies: []

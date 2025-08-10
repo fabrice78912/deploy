@@ -1,0 +1,15 @@
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+
+metadata:
+  name: mon-cluster
+  region: ca-central-1
+
+managedNodeGroups:
+  - name: standard-workers
+    instanceType: t3.medium
+    desiredCapacity: 2
+    minSize: 1
+    maxSize: 3
+    iam:
+      instanceRoleARN: arn:aws:iam::122610497281:role/AmazonEKSNodeRole

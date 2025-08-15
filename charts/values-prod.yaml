@@ -1,9 +1,9 @@
 replicaCount: 3
 namespace: prod
 secrets:
-  MARIADB_ROOT_USER: root
-  MARIADB_ROOT_PASSWORD: password_prod
-  MARIADB_DATABASE: magasin_prod
+  MYSQL_ROOT_USER: root
+  MYSQL_ROOT_PASSWORD: password_prod
+  MYSQL_DATABASE: magasin_prod
 env:
   DB_HOST: prod-backend-db.xxxxxx.ca-central-1.rds.amazonaws.com
   DB_PORT: "3306"
@@ -14,5 +14,5 @@ autoscaling:
   maxReplicas: 6
   targetCPUUtilizationPercentage: 75
   targetMemoryUtilizationPercentage: 80
-service:
-  type: ClusterIP
+#service:
+#  type: Loadbalancer

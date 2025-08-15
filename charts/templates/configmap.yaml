@@ -7,6 +7,6 @@ data:
   DB_HOST: {{ .Values.env.DB_HOST | quote }}
   DB_PORT: {{ .Values.env.DB_PORT | quote }}
   DB_NAME: {{ .Values.env.DB_NAME | quote }}
-  50-server.cnf: |
-    [mysqld]
-    bind-address = 0.0.0.0
+#  50-server.cnf: |
+#    [mysqld]
+#    bind-address = 0.0.0.0

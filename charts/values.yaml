@@ -13,17 +13,20 @@ resources:
     cpu: "500m"
     memory: "1Gi"
 
+#service:
+#  type: NodePort
+#  port: 8080
+#  nodePort: null   # uniquement si type=NodePort
+
 service:
-  type: NodePort
-  port: 8080
-  nodePort: null   # uniquement si type=NodePort
+  type: LoadBalancer
 
 env:
   DB_HOST: ""
   DB_PORT: ""
   DB_NAME: ""
-  MARIADB_ROOT_USER: ""
-  MARIADB_ROOT_PASSWORD: ""
+  MYSQL_ROOT_USER: ""
+  MYSQL_ROOT_PASSWORD: ""
 
 autoscaling:
   enabled: false

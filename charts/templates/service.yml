@@ -8,9 +8,12 @@ spec:
   selector:
     app: backend
   ports:
-    - protocol: TCP
-      port: {{ .Values.service.port }}
-      targetPort: {{ .Values.service.port }}
-      {{- if .Values.service.nodePort }}
-      nodePort: {{ .Values.service.nodePort }}
-      {{- end }}
+    - name: http
+      protocol: TCP
+      port: 80        # Exposé à l’extérieur (LoadBalancer)
+      targetPort: 8080 # Port réel dans ton container
+#    - name: https
+#      protocol: TCP
+#      port: 443       # Exposé à l’extérieur (LoadBalancer)
+#      targetPort: 8443 # Port réel dans ton container
+

@@ -1,0 +1,33 @@
+replicaCount: 1
+
+image:
+  repository: ""       # À définir via CI/CD ou values-<env>.yaml
+  tag: ""              # À définir via CI/CD ou values-<env>.yaml
+  pullPolicy: IfNotPresent
+
+resources:
+  requests:
+    cpu: "250m"
+    memory: "512Mi"
+  limits:
+    cpu: "500m"
+    memory: "1Gi"
+
+service:
+  type: NodePort
+  port: 8080
+  nodePort: null   # uniquement si type=NodePort
+
+env:
+  DB_HOST: ""
+  DB_PORT: ""
+  DB_NAME: ""
+  MARIADB_ROOT_USER: ""
+  MARIADB_ROOT_PASSWORD: ""
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80

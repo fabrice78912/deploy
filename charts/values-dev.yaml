@@ -1,0 +1,12 @@
+replicaCount: 2
+namespace: dev
+secrets:
+  MARIADB_ROOT_USER: root
+  MARIADB_ROOT_PASSWORD: password_dev
+  MARIADB_DATABASE: magasin_dev
+env:
+  DB_HOST: dev-backend-db.xxxxxx.ca-central-1.rds.amazonaws.com
+  DB_PORT: "3306"
+  DB_NAME: backend_dev
+autoscaling:
+  enabled: false

@@ -19,7 +19,8 @@ resources:
 #  nodePort: null   # uniquement si type=NodePort
 
 service:
-  type: Loadbalancer
+  type: LoadBalancer
+
 
 env:
   DB_HOST: ""

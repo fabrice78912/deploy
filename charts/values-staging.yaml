@@ -1,13 +1,13 @@
-replicaCount: 1
+#replicaCount: 4
 namespace: staging
 secrets:
   MYSQL_ROOT_USER: root
-  MYSQL_ROOT_PASSWORD: password_staging
-  MYSQL_DATABASE: magasin_staging
+  MYSQL_ROOT_PASSWORD: Kubernetes2025
+#  MYSQL_DATABASE: cafe_db
 env:
-  DB_HOST: staging-backend-db.xxxxxx.ca-central-1.rds.amazonaws.com
+  DB_HOST: database-1.cv6w0o8csfjc.ca-central-1.rds.amazonaws.com
   DB_PORT: "3306"
-  DB_NAME: backend_staging
+#  DB_NAME: cafe_db
 autoscaling:
   enabled: true
   minReplicas: 2

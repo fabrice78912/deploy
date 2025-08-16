@@ -43,11 +43,20 @@ spec:
               memory: {{ .Values.resources.limits.memory }}
           env:
             - name: DB_HOST
-              value: {{ .Values.env.DB_HOST | quote }}
+              valueFrom:
+                configMapKeyRef:
+                  name: backend-config
+                  key: DB_HOST
             - name: DB_PORT
-              value: {{ .Values.env.DB_PORT | quote }}
+              valueFrom:
+                configMapKeyRef:
+                  name: backend-config
+                  key: DB_PORT
             - name: DB_NAME
-              value: {{ .Values.env.DB_NAME | quote }}
+              valueFrom:
+                configMapKeyRef:
+                  name: backend-config
+                  key: DB_NAME
             - name: MYSQL_ROOT_USER
               valueFrom:
                 secretKeyRef:
@@ -59,4 +68,7 @@ spec:
                   name: backend-secret
                   key: MYSQL_ROOT_PASSWORD
           ports:
-            - containerPort: {{ .Values.service.port }}
+            - name: http
+              containerPort: 8080
+#            - name: https
+#              containerPort: 8443

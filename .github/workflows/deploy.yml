@@ -6,25 +6,16 @@ on:
       environment:
         description: 'Environnement à déployer'
         required: true
-        default: dev
+        default: prod
         type: choice
         options:
           - dev
           - staging
           - prod
-      branch:
-        description: 'Branche Git à déployer'
-        required: false
-        default: dev
-        type: string
       image_tag:
-        description: 'Tag de l’image Docker à déployer'
-        required: true
-        default: latest
-        type: string
-
-#  repository_dispatch:
-#    types: [deploy]
+        description: 'Tag de l’image Docker à déployer (laisser vide pour dernier tag)' # ✅ MODIF
+        required: false # ✅ MODIF
+        type: string # ✅ MODIF
 
 permissions:
   id-token: write
@@ -33,29 +24,27 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment: ${{ github.event.inputs.environment || github.event.client_payload.environment }}
+    environment: ${{ github.event.inputs.environment }}
 
     steps:
       - name: Initialiser variables d'environnement
         id: vars
         env:
-          ENV: ${{ github.event.inputs.environment || github.event.client_payload.environment }}
-          BRANCH: ${{ github.event.inputs.branch || github.event.client_payload.branch }}
-          IMAGE_TAG: ${{ github.event.inputs.image_tag || github.event.client_payload.image_tag }}
+          ENV: ${{ github.event.inputs.environment }}
+          IMAGE_TAG: ${{ github.event.inputs.image_tag }}
         run: |
           echo "ENV=$ENV" >> $GITHUB_ENV
-          echo "BRANCH=$BRANCH" >> $GITHUB_ENV
           echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
 
           echo "Variables d'environnement initialisées :"
           echo "- ENV=$ENV"
-          echo "- BRANCH=$BRANCH"
           echo "- IMAGE_TAG=$IMAGE_TAG"
 
       - name: Checkout du code
         uses: actions/checkout@v3
+        # Utilise la branche sélectionnée sur GitHub (par défaut workflow_dispatch ref)
         with:
-          ref: ${{ env.BRANCH }}
+          ref: ${{ github.ref_name }}
 
       - name: Configurer AWS avec OIDC
         uses: aws-actions/configure-aws-credentials@v2
@@ -69,7 +58,21 @@ jobs:
       - name: Installer Helm
         uses: azure/setup-helm@v3
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          version: v3.12.0
+
+      - name: Récupérer le dernier tag ECR si aucun tag fourni
+        run: |
+          if [ -z "$IMAGE_TAG" ]; then
+            LATEST_TAG=$(aws ecr describe-images \
+              --repository-name touchtunes \
+              --region ca-central-1 \
+              --query 'sort_by(imageDetails,&imagePushedAt)[-1].imageTags[0]' \
+              --output text)
+            echo "IMAGE_TAG=$LATEST_TAG" >> $GITHUB_ENV
+            echo "Dernier tag récupéré depuis ECR : $LATEST_TAG"
+          else
+            echo "IMAGE_TAG déjà fourni : $IMAGE_TAG"
+          fi
 
       - name: Vérifier la présence de l'image Docker dans ECR
         run: |
@@ -78,6 +81,37 @@ jobs:
             echo "ERREUR : L'image Docker avec le tag '$IMAGE_TAG' n'existe PAS dans le dépôt ECR 'touchtunes'."
             exit 1
           fi
+          
+          
+      - name: Préparer les ressources existantes pour Helm
+        env:
+          ENV: ${{ env.ENV }}
+        run: |
+          echo "Préparation des ressources pour Helm dans l'environnement : $ENV"
+
+          prepare_for_helm() {
+            local kind=$1
+            local name=$2
+            local namespace=$3
+            local release=backend-$namespace
+
+            if kubectl get $kind $name -n $namespace > /dev/null 2>&1; then
+              echo "🔄 $kind/$name existe déjà → patch pour $release"
+              kubectl label $kind $name app.kubernetes.io/managed-by=Helm -n $namespace --overwrite
+              kubectl annotate $kind $name \
+                meta.helm.sh/release-name=$release \
+                meta.helm.sh/release-namespace=$namespace \
+                -n $namespace --overwrite
+            else
+              echo "✅ $kind/$name n'existe pas, Helm pourra le créer."
+            fi
+          }
+
+          # Liste des ressources critiques à préparer
+          prepare_for_helm secret backend-secret $ENV
+          prepare_for_helm configmap backend-config $ENV
+          prepare_for_helm service backend-service $ENV
+
 
       - name: Déployer avec Helm
         env:
@@ -85,241 +119,19 @@ jobs:
           IMAGE_TAG: ${{ env.IMAGE_TAG }}
           ENV: ${{ env.ENV }}
         run: |
-          helm upgrade --install backend ./charts \
+          echo "Déploiement sur l'environnement : $ENV"
+          echo "Tag image : $IMAGE_TAG"
+          
+          helm upgrade --install backend-$ENV ./charts \
             --namespace $ENV \
             --create-namespace \
             --values ./charts/values.yaml \
             --values ./charts/values-$ENV.yaml \
-            --set image.repository="$AWS_ACCOUNT_ID.dkr.ecr.ca-central-1.amazonaws.com/touchtunes" \
-            --set image.tag=$IMAGE_TAG  
+            --set image.repository=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ca-central-1.amazonaws.com/touchtunes \
+            --set image.tag=$IMAGE_TAG \
+            --atomic
 
       - name: Vérifier le statut des pods déployés
         run: |
           kubectl get pods -n $ENV
           kubectl describe deployment backend-deployment -n $ENV
-
-
-
-#name: Déploiement Multi-Environnement (OIDC)
-#
-## Déclencheurs possibles : manuel (workflow_dispatch) ou via repository_dispatch (API)
-#on:
-#  workflow_dispatch:
-#    inputs:
-#      environment:
-#        description: 'Environnement à déployer'
-#        required: true
-#        default: dev
-#        type: choice
-#        options:
-#          - dev
-#          - staging
-#          - prod
-#      branch:
-#        description: 'Branche Git à déployer'
-#        required: false
-#        default: dev
-#        type: string
-#
-#  repository_dispatch:
-#    types: [deploy]
-#
-## Permissions pour utiliser OIDC et accéder au repo
-#permissions:
-#  id-token: write
-#  contents: read
-#
-#jobs:
-#  deploy:
-#    runs-on: ubuntu-latest
-#
-#    # Nom de l'environnement GitHub (pour gestion secrets, protections, etc.)
-#    environment: ${{ github.event.inputs.environment || github.event.client_payload.environment }}
-#
-#    steps:
-#      # Étape 1 : Initialiser les variables d’environnement à partir des inputs ou du payload dispatch
-#      - name: Initialiser variables d'environnement
-#        id: vars
-#        env:
-#          ENV: ${{ github.event.inputs.environment || github.event.client_payload.environment }}
-#          BRANCH: ${{ github.event.inputs.branch || github.event.client_payload.branch }}
-#          IMAGE_TAG: ${{ github.event.client_payload.image_tag }}
-#        run: |
-#          echo "ENV=$ENV" >> $GITHUB_ENV
-#          echo "BRANCH=$BRANCH" >> $GITHUB_ENV
-#          echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
-#
-#          echo "Variables d'environnement initialisées :"
-#          echo "- ENV=$ENV"
-#          echo "- BRANCH=$BRANCH"
-#          echo "- IMAGE_TAG=$IMAGE_TAG"
-#
-#      # Étape 2 : Checkout du code à la branche spécifiée
-#      - name: Checkout du code
-#        uses: actions/checkout@v3
-#        with:
-#          ref: ${{ env.BRANCH }}
-#
-#      # Étape 3 : Configuration AWS via OIDC (pas besoin de secrets AWS statiques)
-#      - name: Configurer AWS avec OIDC
-#        uses: aws-actions/configure-aws-credentials@v2
-#        with:
-#          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-eks-role
-#          aws-region: ca-central-1
-#
-#      # Étape 4 : Mise à jour du kubeconfig pour accéder à EKS
-#      - name: Connexion à EKS (mise à jour kubeconfig)
-#        run: aws eks update-kubeconfig --region ca-central-1 --name mon-cluster
-#
-#      # Étape 5 : Installer Helm (outil de gestion Kubernetes)
-#      - name: Installer Helm
-#        uses: azure/setup-helm@v3
-#
-#      # Étape 6 : Vérifier que l'image Docker avec le tag existe dans ECR
-#      - name: Vérifier la présence de l'image Docker dans ECR
-#        run: |
-#          echo "Vérification de l'image $IMAGE_TAG dans ECR..."
-#          if ! aws ecr describe-images --repository-name touchtunes --image-ids imageTag=$IMAGE_TAG --region ca-central-1; then
-#            echo "ERREUR : L'image Docker avec le tag '$IMAGE_TAG' n'existe PAS dans le dépôt ECR 'touchtunes'."
-#            echo "Veuillez vérifier que l'image a bien été poussée avant de déployer."
-#            exit 1
-#          fi
-#
-#      # Étape 7 : Déploiement avec Helm, injection des variables via env
-#      - name: Déployer avec Helm
-#        env:
-#          AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
-#          IMAGE_TAG: ${{ env.IMAGE_TAG }}
-#          ENV: ${{ env.ENV }}
-#        run: |
-#          echo "Déploiement sur l'environnement : $ENV"
-#          echo "Tag image : $IMAGE_TAG"
-#
-#          helm upgrade --install microservice-a ./charts/microservice-a \
-#            --namespace mon-namespace-$ENV \
-#            --create-namespace \
-#            --values ./charts/microservice-a/values.yaml \
-#            --values ./charts/microservice-a/values-$ENV.yaml \
-#            --set image.repository="$AWS_ACCOUNT_ID.dkr.ecr.ca-central-1.amazonaws.com/touchtunes" \
-#            --set image.tag=$IMAGE_TAG
-#
-#      # Étape 8 : Vérifier le statut du déploiement et lister les pods
-#      - name: Vérifier le statut des pods déployés
-#        run: |
-#          echo "Vérification des pods dans le namespace mon-namespace-$ENV..."
-#          kubectl rollout status deployment/microservice-a -n mon-namespace-$ENV --timeout=120s
-#          kubectl get pods -n mon-namespace-$ENV
-
-
-
-#name: Déploiement Multi-Environnement (OIDC)
-#
-## Déclencheurs du workflow
-#on:
-#  workflow_dispatch:  # Déclenchement manuel depuis l'interface GitHub
-#    inputs:
-#      environment:  # Choix de l'environnement (dev, staging, prod)
-#        description: 'Environnement à déployer'
-#        required: true
-#        default: dev
-#        type: choice
-#        options:
-#          - dev
-#          - staging
-#          - prod
-#      branch:   # Branche Git à déployer (ex: dev, main, staging)
-#        description: 'Branche Git à déployer'
-#        required: false
-#        default: dev
-#        type: string
-#
-#  repository_dispatch: # Déclenchement par un autre workflow via API (ex: CI)
-#    types: [deploy]
-#
-## Permissions nécessaires pour OIDC
-#permissions:
-#  id-token: write    # Obligatoire pour s'authentifier via OIDC (sans clé AWS)
-#  contents: read     # Pour pouvoir lire le repo Git (checkout)
-#
-#jobs:
-#  deploy:
-#    runs-on: ubuntu-latest   # Agent GitHub qui exécutera le job
-#
-#    # Nom de l'environnement GitHub (pour gérer secrets & protections)
-#    environment: ${{ github.event.inputs.environment || github.event.client_payload.environment }}
-#
-#    steps:
-#      # Étape 1 : Récupération des variables d'entrée ou payload de repository_dispatch
-#      - name: Déterminer les paramètres
-#        id: vars
-#        run: |
-#          # Récupération de l'environnement (manuel ou via dispatch)
-#          ENV="${{ github.event.inputs.environment || github.event.client_payload.environment }}"
-#          # Récupération de la branche git (manuel ou via dispatch)
-#          BRANCH="${{ github.event.inputs.branch || github.event.client_payload.branch }}"
-#          # Récupération du tag image uniquement via repository_dispatch (pas dispo dans manuel)
-#          IMAGE_TAG="${{ github.event.client_payload.image_tag }}"
-#
-#          # Export des variables dans l'environnement d'exécution GitHub
-#          echo "ENV=$ENV" >> $GITHUB_ENV
-#          echo "BRANCH=$BRANCH" >> $GITHUB_ENV
-#          echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
-#
-#          echo "Environnement : $ENV"
-#          echo "Branche : $BRANCH"
-#          echo "Tag image : $IMAGE_TAG"
-#
-#      # Étape 2 : Checkout du code source (chart Helm)
-#      - name: Checkout du code
-#        uses: actions/checkout@v3
-#        with:
-#          ref: ${{ env.BRANCH }}
-#
-#      # Étape 3 : Configuration AWS via OIDC (pas besoin de secrets AWS dans GitHub)
-#      - name: Configurer AWS avec OIDC
-#        uses: aws-actions/configure-aws-credentials@v2
-#        with:
-#          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/github-actions-eks-role
-#          aws-region: ca-central-1
-#
-#      # Étape 4 : Connexion au cluster EKS (mise à jour du kubeconfig)
-#      - name: Connexion à EKS
-#        run: aws eks update-kubeconfig --region ca-central-1 --name mon-cluster
-#
-#      # Étape 5 : Installer Helm (outil de déploiement Kubernetes)
-#      - name: Installer Helm
-#        uses: azure/setup-helm@v3
-#
-#      # Étape 6 : Vérifier la présence de l'image Docker dans ECR
-#      - name: Vérifier la présence de l'image Docker dans ECR
-#        id: check-image
-#        run: |
-#          echo "Vérification de l'image $IMAGE_TAG dans ECR..."
-#          if ! aws ecr describe-images --repository-name touchtunes --image-ids imageTag=$IMAGE_TAG --region ca-central-1; then
-#            echo "ERREUR : L'image Docker avec le tag '$IMAGE_TAG' n'existe PAS dans le dépôt ECR 'touchtunes'."
-#            echo "Veuillez vérifier que l'image a bien été poussée avant de déployer."
-#            exit 1
-#          fi
-#
-#      # Étape 7 : Déploiement avec Helm
-#      - name: Déployer avec Helm
-#        run: |
-#
-#          echo "Déploiement sur l'environnement : $ENV"
-#          echo "Tag image : $IMAGE_TAG"
-#
-#          # Commande Helm upgrade/install
-#          helm upgrade --install microservice-a ./charts/microservice-a \
-#            --namespace mon-namespace-$ENV \
-#            --create-namespace \
-#            --values ./charts/microservice-a/values.yaml \
-#            --values ./charts/microservice-a/values-$ENV.yaml \
-#            --set image.repository="${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ca-central-1.amazonaws.com/touchtunes" \
-#            --set image.tag=$IMAGE_TAG
-#
-#
-#      - name: Vérifier le statut des pods déployés
-#        run: |
-#          echo "Vérification des pods dans le namespace mon-namespace-$ENV..."
-#          kubectl rollout status deployment/microservice-a -n mon-namespace-$ENV --timeout=120s
-#          kubectl get pods -n mon-namespace-$ENV

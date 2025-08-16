@@ -1,8 +1,8 @@
-replicaCount: 1
+replicaCount: 2
 
 image:
-  repository: ""       # À définir via CI/CD ou values-<env>.yaml
-  tag: ""              # À définir via CI/CD ou values-<env>.yaml
+  repository: "" # repository par défaut
+  tag: ""                                     # tag par défaut
   pullPolicy: IfNotPresent
 
 resources:
@@ -13,20 +13,12 @@ resources:
     cpu: "500m"
     memory: "1Gi"
 
-#service:
-#  type: NodePort
-#  port: 8080
-#  nodePort: null   # uniquement si type=NodePort
-
 service:
-  type: Loadbalancer
+  type: LoadBalancer
 
 env:
-  DB_HOST: ""
-  DB_PORT: ""
-  DB_NAME: ""
-  MYSQL_ROOT_USER: ""
-  MYSQL_ROOT_PASSWORD: ""
+  DB_NAME: cafe_db
+
 
 autoscaling:
   enabled: false

@@ -10,9 +10,9 @@ spec:
   ports:
     - name: http
       protocol: TCP
-      port: 80
-      targetPort: 80
-    - name: https
-      protocol: TCP
-      port: 443
-      targetPort: 443
+      port: 80        # Exposé à l’extérieur (LoadBalancer)
+      targetPort: 8080 # Port réel dans ton container
+#    - name: https
+#      protocol: TCP
+#      port: 443       # Exposé à l’extérieur (LoadBalancer)
+#      targetPort: 8443 # Port réel dans ton container

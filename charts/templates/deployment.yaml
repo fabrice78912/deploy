@@ -2,11 +2,11 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: backend-deployment
-  namespace: {{ .Values.env.namespace }}
+  namespace: {{ .Values.namespace }}
   labels:
     app: backend
 spec:
-  replicas: {{ .Values.env.replicaCount }}
+  replicas: {{ .Values.replicaCount }}
   strategy:
     type: RollingUpdate
     rollingUpdate:
@@ -48,15 +48,15 @@ spec:
               value: {{ .Values.env.DB_PORT | quote }}
             - name: DB_NAME
               value: {{ .Values.env.DB_NAME | quote }}
-            - name: MARIADB_ROOT_USER
+            - name: MYSQL_ROOT_USER
               valueFrom:
                 secretKeyRef:
                   name: backend-secret
-                  key: MARIADB_ROOT_USER
-            - name: MARIADB_ROOT_PASSWORD
+                  key: MYSQL_ROOT_USER
+            - name: MYSQL_ROOT_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: backend-secret
-                  key: MARIADB_ROOT_PASSWORD
+                  key: MYSQL_ROOT_PASSWORD
           ports:
             - containerPort: {{ .Values.service.port }}

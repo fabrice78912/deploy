@@ -1,9 +1,9 @@
 replicaCount: 1
 namespace: staging
 secrets:
-  MARIADB_ROOT_USER: root
-  MARIADB_ROOT_PASSWORD: password_staging
-  MARIADB_DATABASE: magasin_staging
+  MYSQL_ROOT_USER: root
+  MYSQL_ROOT_PASSWORD: password_staging
+  MYSQL_DATABASE: magasin_staging
 env:
   DB_HOST: staging-backend-db.xxxxxx.ca-central-1.rds.amazonaws.com
   DB_PORT: "3306"
@@ -14,3 +14,6 @@ autoscaling:
   maxReplicas: 4
   targetCPUUtilizationPercentage: 80
   targetMemoryUtilizationPercentage: 80
+
+#service:
+#  type: Loadbalancer

@@ -16,4 +16,3 @@ spec:
 #      protocol: TCP
 #      port: 443       # Exposé à l’extérieur (LoadBalancer)
 #      targetPort: 8443 # Port réel dans ton container
-

@@ -21,6 +21,7 @@ resources:
 service:
   type: LoadBalancer
 
+
 env:
   DB_HOST: ""
   DB_PORT: ""

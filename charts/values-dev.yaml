@@ -1,10 +1,10 @@
-replicaCount: 2
+#replicaCount: 4
 namespace: dev
 
 secrets:
-  MARIADB_ROOT_USER: root
-  MARIADB_ROOT_PASSWORD: password_dev
-  MARIADB_DATABASE: magasin_dev
+  MYSQL_ROOT_USER: root
+  MYSQL_ROOT_PASSWORD: password_dev
+  MYSQL_DATABASE: magasin_dev
 
 env:
   DB_HOST: dev-backend-db.xxxxxx.ca-central-1.rds.amazonaws.com
@@ -16,3 +16,4 @@ env:
 
 autoscaling:
   enabled: false
+

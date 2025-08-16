@@ -1,4 +1,4 @@
-replicaCount: 3
+#replicaCount: 4
 namespace: prod
 secrets:
   MYSQL_ROOT_USER: root

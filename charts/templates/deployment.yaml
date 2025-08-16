@@ -59,4 +59,7 @@ spec:
                   name: backend-secret
                   key: MYSQL_ROOT_PASSWORD
           ports:
-            - containerPort: {{ .Values.service.port }}
+            - name: http
+              containerPort: 8080
+#            - name: https
+#              containerPort: 8443

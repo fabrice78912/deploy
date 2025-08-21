@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: frontend-config
+  namespace: {{ .Values.namespace }}
+data:
+  API_HOST:  {{ .Values.env.API_HOST | quote }}
+  API_PORT:  {{ .Values.env.API_PORT | quote }}
+

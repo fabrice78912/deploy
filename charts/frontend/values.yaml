@@ -1,5 +1,6 @@
 replicaCount: 2
 
+
 image:
   repository: "" # repository par défaut
   tag: ""                                     # tag par défaut
@@ -15,10 +16,6 @@ resources:
 
 service:
   type: LoadBalancer
-
-env:
-  DB_NAME: cafe_db
-
 
 autoscaling:
   enabled: false

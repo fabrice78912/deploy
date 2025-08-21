@@ -1,0 +1,15 @@
+#replicaCount: 4
+namespace: prod
+
+env:
+  API_HOST: "adbbafe0aa8bc44eca9cd4bd0d8d9779-2044885311.ca-central-1.elb.amazonaws.com"
+  API_PORT: "80"
+#  DB_NAME: cafe_db
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 6
+  targetCPUUtilizationPercentage: 75
+  targetMemoryUtilizationPercentage: 80
+#service:
+#  type: Loadbalancer

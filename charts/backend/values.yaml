@@ -1,0 +1,32 @@
+replicaCount: 4
+
+secrets:
+  MYSQL_ROOT_USER: root
+  MYSQL_ROOT_PASSWORD: Kubernetes2025
+
+image:
+  repository: "122610497281.dkr.ecr.ca-central-1.amazonaws.com/touchtunes" # repository par défaut
+  tag: ""                                     # tag par défaut
+  pullPolicy: IfNotPresent
+
+resources:
+  requests:
+    cpu: "250m"
+    memory: "512Mi"
+  limits:
+    cpu: "500m"
+    memory: "1Gi"
+
+service:
+  type: LoadBalancer
+
+env:
+  DB_NAME: cafe_db
+
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80

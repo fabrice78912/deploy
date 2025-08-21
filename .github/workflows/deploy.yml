@@ -1,10 +1,18 @@
-name: Déploiement Multi-Environnement (OIDC)
+name: Déploiement Multi-Environnement Multi-Service (OIDC)
 
 on:
   workflow_dispatch:
     inputs:
+      microservice:
+        description: "Microservice à déployer (backend ou frontend)"
+        required: true
+        default: backend
+        type: choice
+        options:
+          - backend
+          - frontend
       environment:
-        description: 'Environnement à déployer'
+        description: "Environnement à déployer"
         required: true
         default: prod
         type: choice
@@ -13,9 +21,9 @@ on:
           - staging
           - prod
       image_tag:
-        description: 'Tag de l’image Docker à déployer (laisser vide pour dernier tag)' # ✅ MODIF
-        required: false # ✅ MODIF
-        type: string # ✅ MODIF
+        description: "Tag de l’image Docker à déployer (laisser vide pour dernier tag)"
+        required: false
+        type: string
 
 permissions:
   id-token: write
@@ -32,17 +40,19 @@ jobs:
         env:
           ENV: ${{ github.event.inputs.environment }}
           IMAGE_TAG: ${{ github.event.inputs.image_tag }}
+          MICROSERVICE: ${{ github.event.inputs.microservice }}
         run: |
           echo "ENV=$ENV" >> $GITHUB_ENV
           echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
+          echo "MICROSERVICE=$MICROSERVICE" >> $GITHUB_ENV
 
           echo "Variables d'environnement initialisées :"
           echo "- ENV=$ENV"
           echo "- IMAGE_TAG=$IMAGE_TAG"
+          echo "- MICROSERVICE=$MICROSERVICE"
 
       - name: Checkout du code
         uses: actions/checkout@v3
-        # Utilise la branche sélectionnée sur GitHub (par défaut workflow_dispatch ref)
         with:
           ref: ${{ github.ref_name }}
 
@@ -53,7 +63,10 @@ jobs:
           aws-region: ca-central-1
 
       - name: Connexion à EKS (mise à jour kubeconfig)
-        run: aws eks update-kubeconfig --region ca-central-1 --name mon-cluster
+        run: |
+          aws eks update-kubeconfig \
+            --region ca-central-1 \
+            --name ${{ secrets.CLUSTER_NAME }}
 
       - name: Installer Helm
         uses: azure/setup-helm@v3
@@ -76,62 +89,142 @@ jobs:
 
       - name: Vérifier la présence de l'image Docker dans ECR
         run: |
-          echo "Vérification de l'image $IMAGE_TAG dans ECR..."
+          echo "Vérification de l'image $IMAGE_TAG dans ECR pour $MICROSERVICE..."
           if ! aws ecr describe-images --repository-name touchtunes --image-ids imageTag="$IMAGE_TAG" --region ca-central-1; then
-            echo "ERREUR : L'image Docker avec le tag '$IMAGE_TAG' n'existe PAS dans le dépôt ECR 'touchtunes'."
+            echo "ERREUR : L'image Docker avec le tag '$IMAGE_TAG' n'existe PAS dans le dépôt ECR."
             exit 1
           fi
-          
-          
-      - name: Préparer les ressources existantes pour Helm
-        env:
-          ENV: ${{ env.ENV }}
-        run: |
-          echo "Préparation des ressources pour Helm dans l'environnement : $ENV"
-
-          prepare_for_helm() {
-            local kind=$1
-            local name=$2
-            local namespace=$3
-            local release=backend-$namespace
-
-            if kubectl get $kind $name -n $namespace > /dev/null 2>&1; then
-              echo "🔄 $kind/$name existe déjà → patch pour $release"
-              kubectl label $kind $name app.kubernetes.io/managed-by=Helm -n $namespace --overwrite
-              kubectl annotate $kind $name \
-                meta.helm.sh/release-name=$release \
-                meta.helm.sh/release-namespace=$namespace \
-                -n $namespace --overwrite
-            else
-              echo "✅ $kind/$name n'existe pas, Helm pourra le créer."
-            fi
-          }
-
-          # Liste des ressources critiques à préparer
-          prepare_for_helm secret backend-secret $ENV
-          prepare_for_helm configmap backend-config $ENV
-          prepare_for_helm service backend-service $ENV
-
 
       - name: Déployer avec Helm
         env:
           AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
           IMAGE_TAG: ${{ env.IMAGE_TAG }}
           ENV: ${{ env.ENV }}
+          MICROSERVICE: ${{ env.MICROSERVICE }}
         run: |
-          echo "Déploiement sur l'environnement : $ENV"
+          echo "Déploiement du microservice : $MICROSERVICE"
+          echo "Environnement : $ENV"
           echo "Tag image : $IMAGE_TAG"
-          
-          helm upgrade --install backend-$ENV ./charts \
+
+          helm upgrade --install $MICROSERVICE-$ENV ./charts/$MICROSERVICE \
             --namespace $ENV \
             --create-namespace \
-            --values ./charts/values.yaml \
-            --values ./charts/values-$ENV.yaml \
+            --values ./charts/$MICROSERVICE/values.yaml \
+            --values ./charts/$MICROSERVICE/values-$ENV.yaml \
             --set image.repository=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ca-central-1.amazonaws.com/touchtunes \
-            --set image.tag=$IMAGE_TAG \
-            --atomic
+            --set image.tag=$IMAGE_TAG 
 
       - name: Vérifier le statut des pods déployés
         run: |
           kubectl get pods -n $ENV
-          kubectl describe deployment backend-deployment -n $ENV
+          kubectl describe deployment $MICROSERVICE-deployment -n $ENV
+
+
+#name: Déploiement Multi-Environnement (OIDC)
+#
+#on:
+#  workflow_dispatch:
+#    inputs:
+#      environment:
+#        description: 'Environnement à déployer'
+#        required: true
+#        default: prod
+#        type: choice
+#        options:
+#          - dev
+#          - staging
+#          - prod
+#      image_tag:
+#        description: 'Tag de l’image Docker à déployer (laisser vide pour dernier tag)' # ✅ MODIF
+#        required: false # ✅ MODIF
+#        type: string # ✅ MODIF
+#
+#permissions:
+#  id-token: write
+#  contents: read
+#
+#jobs:
+#  deploy:
+#    runs-on: ubuntu-latest
+#    environment: ${{ github.event.inputs.environment }}
+#
+#    steps:
+#      - name: Initialiser variables d'environnement
+#        id: vars
+#        env:
+#          ENV: ${{ github.event.inputs.environment }}
+#          IMAGE_TAG: ${{ github.event.inputs.image_tag }}
+#        run: |
+#          echo "ENV=$ENV" >> $GITHUB_ENV
+#          echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
+#
+#          echo "Variables d'environnement initialisées :"
+#          echo "- ENV=$ENV"
+#          echo "- IMAGE_TAG=$IMAGE_TAG"
+#
+#      - name: Checkout du code
+#        uses: actions/checkout@v3
+#        # Utilise la branche sélectionnée sur GitHub (par défaut workflow_dispatch ref)
+#        with:
+#          ref: ${{ github.ref_name }}
+#
+#      - name: Configurer AWS avec OIDC
+#        uses: aws-actions/configure-aws-credentials@v2
+#        with:
+#          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsECRRole
+#          aws-region: ca-central-1
+#
+#      - name: Connexion à EKS (mise à jour kubeconfig)
+#        run: |
+#          aws eks update-kubeconfig \
+#            --region ca-central-1 \
+#            --name ${{ secrets.CLUSTER_NAME }}
+#
+#      - name: Installer Helm
+#        uses: azure/setup-helm@v3
+#        with:
+#          version: v3.12.0
+#
+#      - name: Récupérer le dernier tag ECR si aucun tag fourni
+#        run: |
+#          if [ -z "$IMAGE_TAG" ]; then
+#            LATEST_TAG=$(aws ecr describe-images \
+#              --repository-name touchtunes \
+#              --region ca-central-1 \
+#              --query 'sort_by(imageDetails,&imagePushedAt)[-1].imageTags[0]' \
+#              --output text)
+#            echo "IMAGE_TAG=$LATEST_TAG" >> $GITHUB_ENV
+#            echo "Dernier tag récupéré depuis ECR : $LATEST_TAG"
+#          else
+#            echo "IMAGE_TAG déjà fourni : $IMAGE_TAG"
+#          fi
+#
+#      - name: Vérifier la présence de l'image Docker dans ECR
+#        run: |
+#          echo "Vérification de l'image $IMAGE_TAG dans ECR..."
+#          if ! aws ecr describe-images --repository-name touchtunes --image-ids imageTag="$IMAGE_TAG" --region ca-central-1; then
+#            echo "ERREUR : L'image Docker avec le tag '$IMAGE_TAG' n'existe PAS dans le dépôt ECR 'touchtunes'."
+#            exit 1
+#          fi
+#
+#      - name: Déployer avec Helm
+#        env:
+#          AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+#          IMAGE_TAG: ${{ env.IMAGE_TAG }}
+#          ENV: ${{ env.ENV }}
+#        run: |
+#          echo "Déploiement sur l'environnement : $ENV"
+#          echo "Tag image : $IMAGE_TAG"
+#
+#          helm upgrade --install backend-$ENV ./charts \
+#            --namespace $ENV \
+#            --create-namespace \
+#            --values ./charts/values.yaml \
+#            --values ./charts/values-$ENV.yaml \
+#            --set image.repository=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ca-central-1.amazonaws.com/touchtunes \
+#            --set image.tag=$IMAGE_TAG
+#
+#      - name: Vérifier le statut des pods déployés
+#        run: |
+#          kubectl get pods -n $ENV
+#          kubectl describe deployment backend-deployment -n $ENV

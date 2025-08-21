@@ -1,7 +1,11 @@
-replicaCount: 2
+replicaCount: 4
+
+env:
+  API_HOST: ""
+  API_PORT: ""
 
 image:
-  repository: "" # repository par défaut
+  repository: "122610497281.dkr.ecr.ca-central-1.amazonaws.com/touchtunes" # repository par défaut
   tag: ""                                     # tag par défaut
   pullPolicy: IfNotPresent
 
@@ -15,10 +19,6 @@ resources:
 
 service:
   type: LoadBalancer
-
-env:
-  DB_NAME: cafe_db
-
 
 autoscaling:
   enabled: false
